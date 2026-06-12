@@ -107,7 +107,7 @@ async function fromApiFootball() {
       team: p.statistics && p.statistics[0] && p.statistics[0].team && p.statistics[0].team.name,
       value: p.statistics && p.statistics[0] && p.statistics[0].goals
         ? p.statistics[0].goals.total : 0
-    })).filter(p => p.name);
+    })).filter(p => p.name && p.value > 0);
   }
   const matches = (fixData.response || []).map(m => {
     const out = {
@@ -130,8 +130,9 @@ async function fromApiFootball() {
   if (standData && standData.response && standData.response[0]) {
     for (const table of (standData.response[0].league.standings || [])) {
       if (!table.length) continue;
-      const g = String(table[0].group || "").replace(/group\s*/i, "").trim();
-      if (!g) continue;
+      const label = String(table[0].group || "");
+      const m = label.match(/group\s+([A-L])\s*$/i);
+      const g = m ? m[1].toUpperCase() : "3RD";
       standings[g] = table.map(r => ({
         team: r.team && r.team.name,
         p: r.all.played, w: r.all.win, d: r.all.draw, l: r.all.lose,
