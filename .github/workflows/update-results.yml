@@ -2,7 +2,7 @@ name: Update results
 
 on:
   schedule:
-    - cron: "15 */2 * * *"   # every 2 hours, on the quarter hour
+    - cron: "23 * * * *"   # every 2 hours, on the quarter hour
   workflow_dispatch: {}       # adds a manual "Run workflow" button
 
 permissions:
