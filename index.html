@@ -90,7 +90,34 @@
     background:var(--acid); color:var(--acid-ink); white-space:nowrap;
   }
 
+  .fix .venue{display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:0.04em; color:var(--hint); margin-top:2px;}
+  .match.watched .fix .venue{text-decoration:none;}
+
+  .fix .venue{display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:0.04em; color:var(--hint); margin-top:2px; text-decoration:none;}
+
   #tables{display:none;}
+  #stats{display:none;}
+  .statgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; margin-top:8px;}
+  .scard{background:var(--panel); border-radius:12px; padding:14px 16px;}
+  .scard h3{font-size:13px; font-weight:600; color:var(--acid-strong); margin-bottom:8px;}
+  .scard ol{list-style:none; counter-reset:rank;}
+  .scard li{display:flex; align-items:baseline; gap:10px; padding:7px 0; border-top:1px solid var(--rule); font-size:13.5px; counter-increment:rank;}
+  .scard li::before{content:counter(rank,decimal-leading-zero); font-family:var(--mono); font-size:11px; color:var(--hint);}
+  .scard li b{font-weight:600;}
+  .scard li span{color:var(--sub); font-size:12.5px; flex:1;}
+  .scard li .n{font-weight:700; color:var(--acid-strong); flex:0 0 auto;}
+  .scard .empty{font-size:13px; color:var(--hint); padding:8px 0;}
+  #stats{display:none;}
+  .statgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; margin-top:8px;}
+  .scard{background:var(--panel); border-radius:12px; padding:14px 16px;}
+  .scard h3{font-size:13px; font-weight:600; color:var(--acid-strong); margin-bottom:8px;}
+  .scard ol{list-style:none; counter-reset:rank;}
+  .scard li{display:flex; align-items:baseline; gap:10px; padding:7px 0; border-top:1px solid var(--rule); font-size:13.5px; counter-increment:rank;}
+  .scard li::before{content:counter(rank,decimal-leading-zero); font-family:var(--mono); font-size:11px; color:var(--hint);}
+  .scard li b{font-weight:600;}
+  .scard li span{color:var(--sub); font-size:12.5px; flex:1;}
+  .scard li .n{font-weight:700; color:var(--acid-strong);}
+  .scard .empty{font-size:13px; color:var(--hint); padding:8px 0;}
   .tablegrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; margin-top:8px;}
   .gcard{background:var(--panel); border-radius:12px; padding:14px 16px; box-shadow:var(--card-shadow);}
   .gcard h3{font-size:13px; font-weight:600; color:var(--acid-strong); margin-bottom:8px;}
@@ -131,6 +158,7 @@
 <div class="row-controls" id="views">
   <button data-v="sched" class="on">Schedule</button>
   <button data-v="tables">Group tables</button>
+  <button data-v="stats">Top scorers</button>
 </div>
 
 <div id="sched">
@@ -155,6 +183,13 @@
 <div id="tables">
   <div class="tablegrid" id="tablegrid"></div>
   <p class="gnote" id="tablenote"></p>
+</div>
+
+<div id="stats">
+  <div class="statgrid">
+    <div class="scard"><h3>Golden Boot</h3><ol id="scorersList"></ol><p class="empty" id="scorersEmpty">No goals yet. Give it a match or two.</p></div>
+  </div>
+  <p class="gnote">Counts come from the data feed and update with results.</p>
 </div>
 
 <details class="io">
@@ -391,11 +426,14 @@ function stageKey(s){
 /* --- state derived from results.json --- */
 var SCORES = {};      /* m-id -> {s:[h,a], pens:[h,a]?} */
 var KO_FIX = {};      /* m-id -> "Home v Away" for knockouts */
+var VENUES = {};      /* m-id -> "Stadium · City" */
+var STATS = { scorers: [] };
 var API_TABLES = null;
 var STAMP_EXTRA = "";
 
 function joinResults(data){
-  SCORES = {}; KO_FIX = {};
+  SCORES = {}; KO_FIX = {}; VENUES = {};
+  STATS.scorers = data.scorers || [];
   API_TABLES = (data.standings && Object.keys(data.standings).length) ? data.standings : null;
   if (data.updated) {
     var d = new Date(data.updated);
@@ -422,6 +460,7 @@ function joinResults(data){
     var k = stageKey(am.stage);
     if (k === "G") {
       var hit = byTeams[norm(am.home) + "|" + norm(am.away)];
+      if (hit && am.venue) VENUES[hit.id] = am.venue;
       if (hit && am.score) {
         SCORES[hit.id] = { s: hit.swap ? [am.score[1], am.score[0]] : am.score,
                            pens: am.pens ? (hit.swap ? [am.pens[1], am.pens[0]] : am.pens) : null };
@@ -437,6 +476,7 @@ function joinResults(data){
     for (var i = 0; i < n; i++) {
       var am = apiByStage[k][i], id = slots[k][i];
       if (am.home && am.away) KO_FIX[id] = am.home + " v " + am.away;
+      if (am.venue) VENUES[id] = am.venue;
       if (am.score) SCORES[id] = { s: am.score, pens: am.pens || null };
     }
   });
@@ -469,7 +509,8 @@ function render(){
           (watched[id] ? ' checked' : '') + '></label>' +
         '<div class="time">' + esc(time) + (late ? ' <span class="moon" title="Small-hours kick-off">&#9789;</span>' : '') + '</div>' +
         '<div class="fix">' + (isHome || bc==="X" ? '<b>'+esc(fix)+'</b>' : esc(fix)) +
-          (flag==="E" ? '<span class="nat">ENG</span>' : flag==="S" ? '<span class="nat">SCO</span>' : '') + '</div>' +
+          (flag==="E" ? '<span class="nat">ENG</span>' : flag==="S" ? '<span class="nat">SCO</span>' : '') +
+          (VENUES[id] ? '<span class="venue">' + esc(VENUES[id]) + '</span>' : '') + '</div>' +
         '<div class="grp">' + grpLabel + '</div>' +
         '<div class="right">' + right + '</div></div>';
     });
@@ -478,7 +519,20 @@ function render(){
   listEl.innerHTML = html;
   applyFilter();
   buildTables();
+  buildStats();
   metrics();
+}
+
+function buildStats(){
+  function fill(listId, emptyId, rows, unit){
+    var ol = document.getElementById(listId), em = document.getElementById(emptyId);
+    if (!rows.length){ ol.innerHTML = ""; em.style.display = "block"; return; }
+    em.style.display = "none";
+    ol.innerHTML = rows.map(function(p){
+      return '<li><b>' + esc(p.name) + '</b><span>' + esc(p.team || "") + '</span><span class="n">' + p.value + '</span></li>';
+    }).join("");
+  }
+  fill("scorersList", "scorersEmpty", STATS.scorers);
 }
 
 listEl.addEventListener("change", function(e){
@@ -521,16 +575,23 @@ viewsEl.addEventListener("click", function(e){
   viewsEl.querySelectorAll("button").forEach(function(x){ x.classList.toggle("on", x===b); });
   document.getElementById("sched").style.display  = v==="sched"  ? "block" : "none";
   document.getElementById("tables").style.display = v==="tables" ? "block" : "none";
+  document.getElementById("stats").style.display  = v==="stats"  ? "block" : "none";
 });
 
 function buildTables(){
   var note = document.getElementById("tablenote");
   var out = "";
   if (API_TABLES) {
-    Object.keys(API_TABLES).sort().forEach(function(g){
-      out += tableCard("Group " + g, API_TABLES[g]);
+    var keys = Object.keys(API_TABLES).sort(function(a, b){
+      var la = a.length === 1, lb = b.length === 1;
+      if (la !== lb) return la ? -1 : 1;   /* letter groups first */
+      return a.localeCompare(b);
     });
-    note.textContent = "Official tables from the data feed, including FIFA tiebreakers.";
+    keys.forEach(function(g){
+      var letter = g.length === 1;
+      out += tableCard(letter ? "Group " + g : "Best third-placed teams", API_TABLES[g], letter ? 2 : 8);
+    });
+    note.textContent = "Official tables from the data feed, including FIFA tiebreakers. Top two per group qualify, plus the eight best third-placed teams.";
   } else {
     var groups = {};
     DAYS.forEach(function(d){ d[1].forEach(function(m){
@@ -554,18 +615,19 @@ function buildTables(){
       var rows = Object.keys(groups[g]).map(function(t){ return groups[g][t]; });
       rows.forEach(function(r){ r.gd = r.gf - r.ga; r.pts = r.w*3 + r.d; });
       rows.sort(function(a,b){ return b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || a.team.localeCompare(b.team); });
-      out += tableCard("Group " + g, rows);
+      out += tableCard("Group " + g, rows, 2);
     });
     note.textContent = "Computed locally (points, goal difference, goals scored) — official tables appear once the data feed is connected.";
   }
   document.getElementById("tablegrid").innerHTML = out;
 }
-function tableCard(title, rows){
+function tableCard(title, rows, qn){
+  qn = qn || 2;
   var out = '<div class="gcard"><h3>' + esc(title) + '</h3><table>' +
     '<thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>';
   rows.forEach(function(r,i){
     var gd = (r.gd > 0 ? "+" + r.gd : r.gd);
-    out += '<tr class="' + (i<2 ? "q" : "") + '"><td>' + esc(r.team) + '</td><td>'+r.p+'</td><td>'+r.w+
+    out += '<tr class="' + (i<qn ? "q" : "") + '"><td>' + esc(r.team) + '</td><td>'+r.p+'</td><td>'+r.w+
       '</td><td>'+r.d+'</td><td>'+r.l+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+gd+
       '</td><td class="pts">'+r.pts+'</td></tr>';
   });
