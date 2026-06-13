@@ -189,7 +189,7 @@
   <div class="statgrid">
     <div class="scard"><h3>Golden Boot</h3><ol id="scorersList"></ol><p class="empty" id="scorersEmpty">No goals yet. Give it a match or two.</p></div>
   </div>
-  <p class="gnote">Counts come from the data feed and update with results.</p>
+  <p class="gnote">Counts come from the data feed and update with results. <span id="scorersAsOf"></span></p>
 </div>
 
 <details class="io">
@@ -533,6 +533,8 @@ function buildStats(){
     }).join("");
   }
   fill("scorersList", "scorersEmpty", STATS.scorers);
+  var asOf = document.getElementById("scorersAsOf");
+  if (asOf) asOf.textContent = STAMP_EXTRA ? "Scorers " + STAMP_EXTRA + "." : "";
 }
 
 listEl.addEventListener("change", function(e){
