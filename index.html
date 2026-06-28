@@ -107,6 +107,9 @@
   .tie.home{border-left:3px solid var(--coral);}
   .tie.tbc{opacity:0.5; border-style:dashed; box-shadow:none;}
   .tie.champ{border-color:var(--acid-dim); box-shadow:0 0 0 2px var(--acid) inset, var(--card-shadow);}
+  .tie.dest{opacity:1; border:1px solid var(--acid-dim); border-style:solid; box-shadow:0 0 0 1px var(--acid) inset, var(--card-shadow);}
+  .tie.dest .lbl{color:var(--acid-strong); font-weight:700;}
+  .final-col .tie.dest{padding:10px 11px;}
   .tie .team{display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:13.5px; padding:2px 0;}
   .tie .team b{font-weight:600;}
   .tie .team.win b{font-weight:700;}
@@ -145,6 +148,9 @@
   .tie.home{border-left:3px solid var(--coral);}
   .tie.tbc{opacity:0.5; border-style:dashed; box-shadow:none;}
   .tie.champ{border-color:var(--acid-dim); box-shadow:0 0 0 2px var(--acid) inset, var(--card-shadow);}
+  .tie.dest{opacity:1; border:1px solid var(--acid-dim); border-style:solid; box-shadow:0 0 0 1px var(--acid) inset, var(--card-shadow);}
+  .tie.dest .lbl{color:var(--acid-strong); font-weight:700;}
+  .final-col .tie.dest{padding:10px 11px;}
   .tie .team{display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:13.5px; padding:2px 0;}
   .tie .team b{font-weight:600;}
   .tie .team.win b{font-weight:700;}
@@ -213,7 +219,7 @@
   <button data-v="sched" class="on">Schedule</button>
   <button data-v="tables">Group tables</button>
   <button data-v="stats">Top scorers</button>
-  <button data-v="bracket">Bracket</button>
+  <button data-v="bracket">Knockout Rounds</button>
 </div>
 
 <div id="sched">
@@ -282,6 +288,22 @@
    Teams and scores fill in automatically — channels only.
    ================================================================ */
 var KNOCKOUT_CHANNELS = {
+  m73: ["ITV1", "I"],      // South Africa v Canada
+  m74: ["ITV1", "I"],      // Brazil v Japan
+  m75: ["BBC One", "B"],   // Germany v Paraguay
+  m76: ["ITV1", "I"],      // Netherlands v Morocco
+  m77: ["BBC One", "B"],   // Ivory Coast v Norway
+  m78: ["ITV1", "I"],      // France v Sweden
+  m79: ["ITV1", "I"],      // Mexico v Ecuador
+  m80: ["BBC One", "B"],   // England v Congo DR
+  m81: ["ITV1", "I"],      // Belgium v Senegal
+  m82: ["BBC One", "B"],   // USA v Bosnia & Herzegovina
+  m83: ["BBC One", "B"],   // Spain v Austria
+  m84: ["BBC One", "B"],   // Portugal v Croatia
+  m85: ["BBC One", "B"],   // Switzerland v Algeria
+  m86: ["BBC One", "B"],   // Australia v Egypt
+  m87: ["ITV1", "I"],      // Argentina v Cape Verde
+  m88: ["ITV1", "I"],      // Colombia v Ghana
   m104: ["BBC One & ITV1", "X"]
 };
 
@@ -614,31 +636,30 @@ function teamRow(name, score, win, lost, isHomeNation){
   return '<div class="' + cls + '"><b>' + esc(name || "TBC") + '</b>' +
     (score != null ? '<span class="s">' + score + '</span>' : '') + '</div>';
 }
-function tieCard(id, extraLabel){
+function tieCard(id, extraLabel, dest){
   var info = KO_INFO[id] || {};
   var teams = KO_FIX[id] ? KO_FIX[id].split(" v ") : null;
   var res = SCORES[id];
   var over = KNOCKOUT_CHANNELS[id];
-  if (!teams){
-    return '<div class="tie tbc">' + (extraLabel ? '<span class="lbl">'+extraLabel+'</span>' : '') +
-      '<div class="team"><b>TBC</b></div><div class="team"><b>TBC</b></div>' +
-      '<div class="tmeta">' + (info.time ? esc(info.time) : '') + '</div></div>';
-  }
   var w = winnerOf(res);
-  var hn = /England|Scotland/.test(KO_FIX[id]);
+  var hn = teams && /England|Scotland/.test(KO_FIX[id]);
   var champCls = (id === "m104" && w) ? " champ" : "";
-  var rows = teamRow(teams[0], res ? res.s[0] : null, w===1, w===2) +
-             teamRow(teams[1], res ? res.s[1] : null, w===2, w===1);
+  var baseCls = teams ? "tie" : (dest ? "tie dest" : "tie tbc");
+  var rows = teams
+    ? (teamRow(teams[0], res ? res.s[0] : null, w===1, w===2) +
+       teamRow(teams[1], res ? res.s[1] : null, w===2, w===1))
+    : '<div class="team"><b>TBC</b></div><div class="team"><b>TBC</b></div>';
   var pen = (res && res.pens) ? '<div class="pen">pens ' + res.pens[0] + '&ndash;' + res.pens[1] + '</div>' : '';
   var meta = [];
   if (!res){
-    if (info.time) meta.push(esc(info.time));
+    if (dest && info.date) meta.push(esc(info.date.replace(/^[A-Za-z]+ /, "")) + ' &middot; ' + esc(info.time || ""));
+    else if (info.time) meta.push(esc(info.time));
     if (over) meta.push('<span class="ch ' + over[1] + '">' + esc(over[0]) + '</span>');
-    else meta.push('<span class="ch T">TBC</span>');
+    else if (teams) meta.push('<span class="ch T">TBC</span>');
   } else if (VENUES[id]) {
     meta.push(esc(VENUES[id]));
   }
-  return '<div class="tie' + (hn ? ' home' : '') + champCls + '">' +
+  return '<div class="' + baseCls + (hn ? ' home' : '') + champCls + '">' +
     (extraLabel ? '<span class="lbl">'+extraLabel+'</span>' : '') +
     rows + pen +
     (meta.length ? '<div class="tmeta">' + meta.join("") + '</div>' : '') + '</div>';
@@ -652,12 +673,11 @@ function buildBracket(){
     html += '<div class="br-col"><h4>' + label + '</h4>' +
       ids.map(function(id){ return tieCard(id); }).join("") + '</div>';
   });
-  // final column: Final (emphasised) + third place
+  // final column: Final (emphasised destination) + third place
   var finalId = koIdsFor("Final")[0], thirdId = koIdsFor("3rd")[0];
   html += '<div class="br-col final-col"><h4>Final</h4>' +
-    tieCard(finalId, "Final") +
-    '<div class="tie third-wrap" style="background:none;border:none;box-shadow:none;padding:0;">' +
-      tieCard(thirdId, "Third place") + '</div></div>';
+    tieCard(finalId, "Final", true) +
+    tieCard(thirdId, "Third place", false) + '</div>';
   tree.innerHTML = html;
   var note = document.getElementById("brnote");
   var played = Object.keys(SCORES).filter(function(id){ return KO_INFO[id]; }).length;
